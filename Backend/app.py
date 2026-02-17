@@ -3,54 +3,62 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import joblib
 import os
+import numpy as np
 
-# Paths
+# ---------- Paths ----------
 BASE_DIR = os.path.dirname(__file__)
 MODEL_PATH = os.path.join(BASE_DIR, "backend_model", "diabetes_rf.pkl")
 SCALER_PATH = os.path.join(BASE_DIR, "backend_model", "scaler.pkl")
 
-# Load model and scaler
+# ---------- Load Model ----------
 model = joblib.load(MODEL_PATH)
 scaler = joblib.load(SCALER_PATH)
 
-# FastAPI app
+# ---------- FastAPI ----------
 app = FastAPI(title="Diabetes Prediction API")
 
-# Allow frontend requests
+# ---------- CORS ----------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Or specify your frontend origin
+    allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Input validation
+# ---------- Input Schema ----------
 class DiabetesInput(BaseModel):
-    pregnancies: int
-    glucose: float
-    blood_pressure: float
-    skin_thickness: float
-    insulin: float
-    bmi: float
-    diabetes_pedigree_function: float
-    age: int
+    Pregnancies: float
+    Glucose: float
+    Bp: float
+    Skin: float
+    Insulin: float
+    Bmi: float
+    Dpf: float
+    Age: float
 
+
+# ---------- Prediction API ----------
 @app.post("/predict")
-async def predict_diabetes(data: DiabetesInput):
-    try:
-        # Convert input to list and scale
-        values = [[
-            data.pregnancies,
-            data.glucose,
-            data.blood_pressure,
-            data.skin_thickness,
-            data.insulin,
-            data.bmi,
-            data.diabetes_pedigree_function,
-            data.age
-        ]]
-        scaled = scaler.transform(values)
-        prediction = model.predict(scaled)[0]
-        return {"prediction": int(prediction)}
-    except Exception as e:
-        return {"error": str(e)}
+def predict(data: DiabetesInput):
+
+    values = np.array([[
+        data.Pregnancies,
+        data.Glucose,
+        data.Bp,
+        data.Skin,
+        data.Insulin,
+        data.Bmi,
+        data.Dpf,
+        data.Age
+    ]])
+
+    values = scaler.transform(values)
+
+    prediction = model.predict(values)[0]
+    probability = model.predict_proba(values)[0][1]
+
+    return {
+        "prediction": int(prediction),
+        "probability": float(probability)
+    }

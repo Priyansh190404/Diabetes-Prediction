@@ -1,102 +1,213 @@
 import { useState } from "react";
 import diabetesBg from "./assets/diabetes.png";
+import PreventivePage from "./components/Preventive/PreventivePage.jsx";
 
+/* ---------------- Fields Config ---------------- */
 const fields = [
-  { name: "Pregnancies", label: "Pregnancies", min: 0, max: 20 },
-  { name: "Glucose", label: "Glucose (mg/dL)", min: 50, max: 300 },
-  { name: "BloodPressure", label: "Blood Pressure (mm Hg)", min: 30, max: 200 },
-  { name: "SkinThickness", label: "Skin Thickness (mm)", min: 0, max: 100 },
-  { name: "Insulin", label: "Insulin (µU/mL)", min: 0, max: 900 },
-  { name: "BMI", label: "BMI", min: 10, max: 70 },
-  {
-    name: "DiabetesPedigreeFunction",
-    label: "Diabetes Pedigree Function",
-    min: 0.05,
-    max: 3,
-  },
-  { name: "Age", label: "Age (years)", min: 1, max: 120 },
+  { name: "Pregnancies", label: "Pregnancies", min: 0, max: 20, desc: "Number of times pregnant" },
+  { name: "Glucose", label: "Glucose (mg/dL)", min: 50, max: 300, desc: "Blood sugar level" },
+  { name: "BloodPressure", label: "Blood Pressure (mm Hg)", min: 40, max: 130, desc: "Resting blood pressure" },
+  { name: "SkinThickness", label: "Skin Thickness (mm)", min: 5, max: 60, desc: "Fat thickness under skin" },
+  { name: "Insulin", label: "Insulin (µU/mL)", min: 0, max: 300, desc: "Insulin hormone level" },
+  { name: "BMI", label: "BMI", min: 15, max: 60, desc: "Body Mass Index" },
+  { name: "DiabetesPedigreeFunction", label: "Diabetes Pedigree Function", min: 0, max: 3, desc: "Family diabetes likelihood" },
+  { name: "Age", label: "Age (years)", min: 1, max: 120, desc: "Your age" },
 ];
 
+/* ---------- Simple Questions Mapping ---------- */
+const mapAnswers = (ans) => ({
+  Pregnancies: 0,
+  Glucose: ans.thirst === "Yes" ? 170 : 110,
+  BloodPressure: ans.overweight === "Yes" ? 140 : 80,
+  SkinThickness: ans.overweight === "Yes" ? 35 : 20,
+  Insulin: ans.thirst === "Yes" ? 200 : 80,
+  BMI: ans.overweight === "Yes" ? 35 : 22,
+  DiabetesPedigreeFunction: ans.family === "Yes" ? 1.5 : 0.4,
+  Age: ans.age === "Above 50" ? 60 : ans.age === "30-50" ? 40 : 25,
+});
+
 function App() {
+
   const [data, setData] = useState({});
-  const [errors, setErrors] = useState({});
+  const [showPreventive, setShowPreventive] = useState(false);
+  const [prediction, setPrediction] = useState(null);
+  const [probability, setProbability] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [riskLevel, setRiskLevel] = useState("");
 
-  const validate = (value, min, max) => {
-    if (value === "" || isNaN(value)) return "Required";
-    if (value < min || value > max)
-      return `Must be between ${min} and ${max}`;
-    return "";
+  const [simpleMode, setSimpleMode] = useState(false);
+
+  const [simpleAnswers, setSimpleAnswers] = useState({
+    family: "No",
+    overweight: "No",
+    thirst: "No",
+    urination: "No",
+    age: "Below 30",
+  });
+
+  /* ---------- Submit ---------- */
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+
+      const finalData = simpleMode ? mapAnswers(simpleAnswers) : data;
+
+      const payload = {
+        Pregnancies: Number(finalData.Pregnancies),
+        Glucose: Number(finalData.Glucose),
+        Bp: Number(finalData.BloodPressure),
+        Skin: Number(finalData.SkinThickness),
+        Insulin: Number(finalData.Insulin),
+        Bmi: Number(finalData.BMI),
+        Dpf: Number(finalData.DiabetesPedigreeFunction),
+        Age: Number(finalData.Age),
+      };
+
+      const res = await fetch("http://127.0.0.1:8000/predict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await res.json();
+
+      setPrediction(result.prediction);
+      setProbability(result.probability);
+
+      const risk = result.prediction === 1 ? "High" : "Low";
+      setRiskLevel(risk);
+
+      localStorage.setItem("riskLevel", risk);
+
+    } catch (err) {
+      alert("Backend not running");
+    }
+
+    setLoading(false);
   };
 
-  const handleChange = (e, field) => {
-    const value = Number(e.target.value);
-    setData({ ...data, [field.name]: value });
-    setErrors({
-      ...errors,
-      [field.name]: validate(value, field.min, field.max),
-    });
+  /* ---------- Navigate Preventive ---------- */
+  const goToPreventive = () => {
+    setShowPreventive(true);
   };
 
-  const hasErrors =
-    Object.values(errors).some(Boolean) ||
-    fields.some((f) => data[f.name] === undefined);
+  /* ---------- Show Preventive Page ---------- */
+  if (showPreventive) {
+    return <PreventivePage />;
+  }
 
   return (
     <div
       className="min-h-screen bg-cover bg-center flex items-center justify-center p-6 relative"
-      style={{
-        backgroundImage: `url(${diabetesBg})`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-      }}
+      style={{ backgroundImage: `url(${diabetesBg})` }}
     >
-      {/* SOFT WHITE OVERLAY (NOT TOO STRONG) */}
       <div className="absolute inset-0 bg-white/60"></div>
 
-      {/* MAIN CARD */}
       <div className="relative max-w-4xl w-full bg-white/75 backdrop-blur-lg rounded-3xl shadow-2xl p-8">
-        <h1 className="text-3xl font-bold text-center text-blue-700 mb-2">
-          🩺 Diabetes Risk Prediction
-        </h1>
-        <p className="text-center text-gray-600 mb-6">
-          Enter clinically valid health values
-        </p>
 
-        <form className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {fields.map((field) => (
-            <div key={field.name}>
-              <label className="text-sm font-medium text-gray-700">
-                {field.label}
-              </label>
-              <input
-                type="number"
-                onChange={(e) => handleChange(e, field)}
-                className={`w-full mt-1 px-4 py-2 rounded-xl border ${
-                  errors[field.name]
-                    ? "border-red-500"
-                    : "border-gray-300"
-                } focus:ring-2 focus:ring-blue-400 outline-none`}
-              />
-              {errors[field.name] && (
-                <p className="text-red-500 text-xs mt-1">
-                  ⚠️ {errors[field.name]}
-                </p>
-              )}
-            </div>
-          ))}
+        <h1 className="text-3xl font-bold text-center text-blue-700 mb-4">
+          Diabetes Risk Prediction
+        </h1>
+
+        {/* Toggle */}
+        <label className="flex items-center gap-2 mb-6">
+          <input
+            type="checkbox"
+            checked={simpleMode}
+            onChange={() => setSimpleMode(!simpleMode)}
+          />
+          I don't know medical values — Ask simple health questions
+        </label>
+
+        <form onSubmit={handleSubmit} className="grid md:grid-cols-2 gap-4">
+
+          {/* SIMPLE MODE */}
+          {simpleMode && (
+            <>
+              {Object.keys(simpleAnswers).map((key) => (
+                <div key={key}>
+                  <label className="font-medium capitalize">
+                    {key === "family" && "Family history of diabetes?"}
+                    {key === "overweight" && "Are you overweight?"}
+                    {key === "thirst" && "Do you feel excessive thirst?"}
+                    {key === "urination" && "Frequent urination?"}
+                    {key === "age" && "Age Group"}
+                  </label>
+
+                  <select
+                    className="w-full mt-1 p-2 border rounded-xl"
+                    value={simpleAnswers[key]}
+                    onChange={(e) =>
+                      setSimpleAnswers({ ...simpleAnswers, [key]: e.target.value })
+                    }
+                  >
+                    {key === "age" ? (
+                      <>
+                        <option>Below 30</option>
+                        <option>30-50</option>
+                        <option>Above 50</option>
+                      </>
+                    ) : (
+                      <>
+                        <option>Yes</option>
+                        <option>No</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+              ))}
+            </>
+          )}
+
+          {/* MEDICAL MODE */}
+          {!simpleMode &&
+            fields.map((field) => (
+              <div key={field.name}>
+                <label className="font-medium">{field.label}</label>
+                <p className="text-xs text-gray-500">{field.desc}</p>
+
+                <input
+                  type="number"
+                  min={field.min}
+                  max={field.max}
+                  value={data[field.name] ?? ""}
+                  onChange={(e) =>
+                    setData({ ...data, [field.name]: e.target.value })
+                  }
+                  className="w-full mt-1 px-4 py-2 border rounded-xl"
+                />
+              </div>
+            ))}
 
           <button
-            disabled={hasErrors}
-            className={`col-span-full mt-6 py-3 rounded-xl font-semibold text-white
-              ${
-                hasErrors
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : " from-blue-600 to-teal-500 hover:opacity-90"
-              }`}
+            type="submit"
+            className="col-span-full mt-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-600 to-teal-500"
           >
-            🔍 Predict with Random Forest
+            {loading ? "Predicting..." : "🔍 Predict"}
           </button>
         </form>
+
+        {/* Prediction Result */}
+        {prediction !== null && (
+          <div className="mt-6 text-center">
+
+            <p>Probability: {(probability * 100).toFixed(2)}%</p>
+
+            <h2 className={`text-xl font-bold ${prediction ? "text-red-600" : "text-green-600"}`}>
+              {prediction ? "⚠️ High Risk" : "✅ Low Risk"}
+            </h2>
+
+            <button
+              onClick={goToPreventive}
+              className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition"
+            >
+              View Preventive Measures
+            </button>
+
+          </div>
+        )}
 
         <p className="text-xs text-center text-gray-500 mt-6">
           ⚠️ This tool is for educational purposes only.
