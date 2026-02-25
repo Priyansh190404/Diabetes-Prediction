@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import diabetesBg from "./assets/diabetes.png";
 import PreventivePage from "./components/Preventive/PreventivePage.jsx";
@@ -33,7 +34,8 @@ function App() {
   const [prediction, setPrediction] = useState(null);
   const [probability, setProbability] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [riskLevel, setRiskLevel] = useState("");
+ const [riskLevel, setRiskLevel] = useState("low");
+
 
   const [simpleMode, setSimpleMode] = useState(false);
 
@@ -45,53 +47,68 @@ function App() {
     age: "Below 30",
   });
 
-  /* ---------- Submit ---------- */
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
 
-    try {
+  
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setLoading(true);
 
-      const finalData = simpleMode ? mapAnswers(simpleAnswers) : data;
+  try {
 
-      const payload = {
-        Pregnancies: Number(finalData.Pregnancies),
-        Glucose: Number(finalData.Glucose),
-        Bp: Number(finalData.BloodPressure),
-        Skin: Number(finalData.SkinThickness),
-        Insulin: Number(finalData.Insulin),
-        Bmi: Number(finalData.BMI),
-        Dpf: Number(finalData.DiabetesPedigreeFunction),
-        Age: Number(finalData.Age),
-      };
+    const finalData = simpleMode ? mapAnswers(simpleAnswers) : data;
 
-      const res = await fetch("http://127.0.0.1:8000/predict", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+    /* ⭐ Default fallback values */
+    const payload = {
+      Pregnancies: Number(finalData.Pregnancies || 0),
+      Glucose: Number(finalData.Glucose || 120),
+      Bp: Number(finalData.BloodPressure || 70),
+      Skin: Number(finalData.SkinThickness || 20),
+      Insulin: Number(finalData.Insulin || 80),
+      Bmi: Number(finalData.BMI || 25),
+      Dpf: Number(finalData.DiabetesPedigreeFunction || 0.5),
+      Age: Number(finalData.Age || 30),
+    };
 
-      const result = await res.json();
+    const res = await fetch("http://127.0.0.1:8000/predict", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
 
-      setPrediction(result.prediction);
-      setProbability(result.probability);
+    const result = await res.json();
 
-      const risk = result.prediction === 1 ? "High" : "Low";
-      setRiskLevel(risk);
+    setPrediction(result.prediction);
+    setProbability(result.probability);
 
-      localStorage.setItem("riskLevel", risk);
+    /* ⭐ Risk Logic */
+    let risk = "Low";
 
-    } catch (err) {
-      alert("Backend not running");
+    if (result.probability >= 0.7) {
+      risk = "High";
+    } else if (result.probability >= 0.4) {
+      risk = "Medium";
     }
 
+    setRiskLevel(risk.toLowerCase());
+    localStorage.setItem("riskLevel", risk.toLowerCase());
+
+  } catch (err) {
+
+    console.error(err);
+    alert("Backend not running");
+
+  } finally {
+
     setLoading(false);
-  };
+
+  }
+};
 
   /* ---------- Navigate Preventive ---------- */
-  const goToPreventive = () => {
-    setShowPreventive(true);
-  };
+ const goToPreventive = () => {
+  localStorage.setItem("riskLevel", riskLevel);
+  setShowPreventive(true);
+};
 
   /* ---------- Show Preventive Page ---------- */
   if (showPreventive) {
@@ -195,9 +212,22 @@ function App() {
 
             <p>Probability: {(probability * 100).toFixed(2)}%</p>
 
-            <h2 className={`text-xl font-bold ${prediction ? "text-red-600" : "text-green-600"}`}>
-              {prediction ? "⚠️ High Risk" : "✅ Low Risk"}
-            </h2>
+            {/* Risk Display */}
+           {/* Risk Display */}
+<h2
+  className={`text-xl font-bold 
+    ${riskLevel === "high"
+      ? "text-red-600"
+      : riskLevel === "medium"
+      ? "text-yellow-500"
+      : "text-green-600"
+    }
+  `}
+>
+  {riskLevel === "high" && "⚠️ High Risk"}
+  {riskLevel === "medium" && "🟡 Medium Risk"}
+  {riskLevel === "low" && "✅ Low Risk"}
+</h2>
 
             <button
               onClick={goToPreventive}
@@ -208,10 +238,6 @@ function App() {
 
           </div>
         )}
-
-        <p className="text-xs text-center text-gray-500 mt-6">
-          ⚠️ This tool is for educational purposes only.
-        </p>
       </div>
     </div>
   );

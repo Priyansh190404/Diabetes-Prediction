@@ -1,40 +1,34 @@
 import "./Preventive.css";
 import PreventiveCard from "./PreventiveCard";
-import {
-  getPreventiveData
-} from "./preventiveData";
+import { getPreventiveData } from "./preventiveData";
 
 function PreventivePage() {
 
-  /* 🔥 SIMULATED RISK LEVEL
-     Later you will pass this from prediction page */
-  const riskLevel = "high"; // change low / medium / high
-
-  const data = getPreventiveData(riskLevel);
+  const risk = localStorage.getItem("riskLevel") || "low";
+  const data = getPreventiveData(risk);
 
   return (
-    <div className="preventive-container">
+    <div className="preventive-page">
+      <div className="preventive-wrapper">
+          
 
-      <h1 className="main-title">
-        Preventive Measures ({riskLevel.toUpperCase()} Risk)
-      </h1>
+        <h1 className="main-title">
+  Preventive Measures <span>({risk.toUpperCase()} Risk)</span>
+</h1>
+        {data.map((section, index) => (
+          <div key={index}>
+            <h2 className="section-title">{section.title}</h2>
+            <p className="section-subtitle">{section.subtitle}</p>
 
-      {data.map((section, index) => (
-        <div key={index}>
-
-          <h2 className="section-title">
-            {section.title}
-          </h2>
-
-          <div className="card-grid">
-            {section.items.map((item, i) => (
-              <PreventiveCard key={i} {...item} />
-            ))}
+            <div className="card-grid">
+              {section.items.map((item, i) => (
+                <PreventiveCard key={i} item={item} />
+              ))}
+            </div>
           </div>
+        ))}
 
-        </div>
-      ))}
-
+      </div>
     </div>
   );
 }
