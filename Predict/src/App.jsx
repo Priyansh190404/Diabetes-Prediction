@@ -1,20 +1,23 @@
 import { useState } from "react";
 import diabetesBg from "./assets/diabetes.png";
 import PreventivePage from "./components/Preventive/PreventivePage.jsx";
+import LandingPage from "./pages/LandingPage.jsx";
+import { Routes, Route, useNavigate } from "react-router-dom";
+import Chatbot from "./components/Preventive/Chatbot.jsx";
+import FieldsGuide from "./components/FieldsGuide.jsx";
 
 /* ---------------- Fields Config ---------------- */
 const fields = [
-  { name: "Pregnancies", label: "Pregnancies", min: 0, max: 20, desc: "Number of times pregnant" },
-  { name: "Glucose", label: "Glucose (mg/dL)", min: 50, max: 300, desc: "Blood sugar level" },
-  { name: "BloodPressure", label: "Blood Pressure (mm Hg)", min: 40, max: 130, desc: "Resting blood pressure" },
-  { name: "SkinThickness", label: "Skin Thickness (mm)", min: 5, max: 60, desc: "Fat thickness under skin" },
-  { name: "Insulin", label: "Insulin (µU/mL)", min: 0, max: 300, desc: "Insulin hormone level" },
-  { name: "BMI", label: "BMI", min: 15, max: 60, desc: "Body Mass Index" },
-  { name: "DiabetesPedigreeFunction", label: "Diabetes Pedigree Function", min: 0, max: 3, desc: "Family diabetes likelihood" },
-  { name: "Age", label: "Age (years)", min: 1, max: 120, desc: "Your age" },
+  { name: "Pregnancies", label: "Pregnancies", min: 0, max: 20 },
+  { name: "Glucose", label: "Glucose", min: 50, max: 300 },
+  { name: "BloodPressure", label: "Blood Pressure", min: 40, max: 130 },
+  { name: "SkinThickness", label: "Skin Thickness", min: 5, max: 60 },
+  { name: "Insulin", label: "Insulin", min: 0, max: 300 },
+  { name: "BMI", label: "BMI", min: 15, max: 60 },
+  { name: "DiabetesPedigreeFunction", label: "DPF", min: 0, max: 3 },
+  { name: "Age", label: "Age", min: 1, max: 120 },
 ];
 
-/* ---------- Simple Questions Mapping ---------- */
 const mapAnswers = (ans) => ({
   Pregnancies: 0,
   Glucose: ans.thirst === "Yes" ? 170 : 110,
@@ -26,14 +29,16 @@ const mapAnswers = (ans) => ({
   Age: ans.age === "Above 50" ? 60 : ans.age === "30-50" ? 40 : 25,
 });
 
-function App() {
+function PredictionPage() {
+
+  const navigate = useNavigate();
 
   const [data, setData] = useState({});
-  const [showPreventive, setShowPreventive] = useState(false);
   const [prediction, setPrediction] = useState(null);
   const [probability, setProbability] = useState(null);
+  const [explanation, setExplanation] = useState([]); // ✅ FIX 1
   const [loading, setLoading] = useState(false);
-  const [riskLevel, setRiskLevel] = useState("");
+  const [riskLevel, setRiskLevel] = useState("low");
 
   const [simpleMode, setSimpleMode] = useState(false);
 
@@ -45,24 +50,22 @@ function App() {
     age: "Below 30",
   });
 
-  /* ---------- Submit ---------- */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-
       const finalData = simpleMode ? mapAnswers(simpleAnswers) : data;
 
       const payload = {
-        Pregnancies: Number(finalData.Pregnancies),
-        Glucose: Number(finalData.Glucose),
-        Bp: Number(finalData.BloodPressure),
-        Skin: Number(finalData.SkinThickness),
-        Insulin: Number(finalData.Insulin),
-        Bmi: Number(finalData.BMI),
-        Dpf: Number(finalData.DiabetesPedigreeFunction),
-        Age: Number(finalData.Age),
+        Pregnancies: Number(finalData.Pregnancies || 0),
+        Glucose: Number(finalData.Glucose || 120),
+        Bp: Number(finalData.BloodPressure || 70),
+        Skin: Number(finalData.SkinThickness || 20),
+        Insulin: Number(finalData.Insulin || 80),
+        Bmi: Number(finalData.BMI || 25),
+        Dpf: Number(finalData.DiabetesPedigreeFunction || 0.5),
+        Age: Number(finalData.Age || 30),
       };
 
       const res = await fetch("http://127.0.0.1:8000/predict", {
@@ -75,28 +78,26 @@ function App() {
 
       setPrediction(result.prediction);
       setProbability(result.probability);
+      setExplanation(result.explanation || []); // ✅ FIX 2
 
-      const risk = result.prediction === 1 ? "High" : "Low";
-      setRiskLevel(risk);
+      let risk = "Low";
+      if (result.probability >= 0.7) risk = "High";
+      else if (result.probability >= 0.4) risk = "Medium";
 
-      localStorage.setItem("riskLevel", risk);
+      setRiskLevel(risk.toLowerCase());
+      localStorage.setItem("riskLevel", risk.toLowerCase());
 
     } catch (err) {
       alert("Backend not running");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
-  /* ---------- Navigate Preventive ---------- */
   const goToPreventive = () => {
-    setShowPreventive(true);
+    localStorage.setItem("riskLevel", riskLevel);
+    navigate("/preventive");
   };
-
-  /* ---------- Show Preventive Page ---------- */
-  if (showPreventive) {
-    return <PreventivePage />;
-  }
 
   return (
     <div
@@ -107,114 +108,188 @@ function App() {
 
       <div className="relative max-w-4xl w-full bg-white/75 backdrop-blur-lg rounded-3xl shadow-2xl p-8">
 
-        <h1 className="text-3xl font-bold text-center text-blue-700 mb-4">
-          Diabetes Risk Prediction
-        </h1>
+        <div className="flex items-center justify-center gap-3 mb-4">
+          <h1 className="text-3xl font-bold text-blue-700">
+            Diabetes Risk Prediction
+          </h1>
+          <FieldsGuide />
+        </div>
+        <div className="flex justify-center mb-4 gap-4">
+  <button
+    onClick={() => setSimpleMode(false)}
+    className={`px-4 py-2 rounded-lg ${
+      !simpleMode ? "bg-blue-600 text-white" : "bg-gray-200"
+    }`}
+  >
+    Advanced
+  </button>
 
-        {/* Toggle */}
-        <label className="flex items-center gap-2 mb-6">
-          <input
-            type="checkbox"
-            checked={simpleMode}
-            onChange={() => setSimpleMode(!simpleMode)}
-          />
-          I don't know medical values — Ask simple health questions
+  <button
+    onClick={() => setSimpleMode(true)}
+    className={`px-4 py-2 rounded-lg ${
+      simpleMode ? "bg-blue-600 text-white" : "bg-gray-200"
+    }`}
+  >
+    Simple
+  </button>
+</div>
+<form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
+
+  {/* ✅ SIMPLE MODE */}
+  {simpleMode ? (
+    <>
+      {[
+        { key: "family", label: "Family History?" },
+        { key: "overweight", label: "Overweight?" },
+        { key: "thirst", label: "Excessive Thirst?" },
+        { key: "urination", label: "Frequent Urination?" },
+      ].map((q, i) => (
+        <div key={i} className="flex flex-col col-span-2">
+          <label className="text-sm font-medium text-gray-700">
+            {q.label}
+          </label>
+
+          <select
+            className="p-2 border rounded-lg mt-1"
+            value={simpleAnswers[q.key]}
+            onChange={(e) =>
+              setSimpleAnswers({
+                ...simpleAnswers,
+                [q.key]: e.target.value,
+              })
+            }
+          >
+            <option>Yes</option>
+            <option>No</option>
+          </select>
+        </div>
+      ))}
+
+      {/* Age */}
+      <div className="flex flex-col col-span-2">
+        <label className="text-sm font-medium text-gray-700">
+          Age Group
         </label>
 
-        <form onSubmit={handleSubmit} className="grid md:grid-cols-2 gap-4">
+        <select
+          className="p-2 border rounded-lg mt-1"
+          value={simpleAnswers.age}
+          onChange={(e) =>
+            setSimpleAnswers({
+              ...simpleAnswers,
+              age: e.target.value,
+            })
+          }
+        >
+          <option>Below 30</option>
+          <option>30-50</option>
+          <option>Above 50</option>
+        </select>
+      </div>
+    </>
+  ) : (
+    /* ✅ ADVANCED MODE (your existing inputs) */
+    fields.map((field, index) => (
+      <div key={index} className="flex flex-col">
+        <label className="text-sm font-medium text-gray-700">
+          {field.label}
+        </label>
 
-          {/* SIMPLE MODE */}
-          {simpleMode && (
-            <>
-              {Object.keys(simpleAnswers).map((key) => (
-                <div key={key}>
-                  <label className="font-medium capitalize">
-                    {key === "family" && "Family history of diabetes?"}
-                    {key === "overweight" && "Are you overweight?"}
-                    {key === "thirst" && "Do you feel excessive thirst?"}
-                    {key === "urination" && "Frequent urination?"}
-                    {key === "age" && "Age Group"}
-                  </label>
+        <input
+          type="number"
+          min={field.min}
+          max={field.max}
+          placeholder={field.label}
+          className="p-2 border rounded-lg mt-1"
+          onChange={(e) =>
+            setData({
+              ...data,
+              [field.name]: e.target.value,
+            })
+          }
+        />
+      </div>
+    ))
+  )}
 
-                  <select
-                    className="w-full mt-1 p-2 border rounded-xl"
-                    value={simpleAnswers[key]}
-                    onChange={(e) =>
-                      setSimpleAnswers({ ...simpleAnswers, [key]: e.target.value })
-                    }
-                  >
-                    {key === "age" ? (
-                      <>
-                        <option>Below 30</option>
-                        <option>30-50</option>
-                        <option>Above 50</option>
-                      </>
-                    ) : (
-                      <>
-                        <option>Yes</option>
-                        <option>No</option>
-                      </>
-                    )}
-                  </select>
-                </div>
-              ))}
-            </>
-          )}
+  {/* BUTTON */}
+  <div className="col-span-2">
+    <button
+      type="submit"
+      className="w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-600 to-teal-500"
+    >
+      {loading ? "Predicting..." : "Predict"}
+    </button>
+  </div>
 
-          {/* MEDICAL MODE */}
-          {!simpleMode &&
-            fields.map((field) => (
-              <div key={field.name}>
-                <label className="font-medium">{field.label}</label>
-                <p className="text-xs text-gray-500">{field.desc}</p>
+</form>
 
-                <input
-                  type="number"
-                  min={field.min}
-                  max={field.max}
-                  value={data[field.name] ?? ""}
-                  onChange={(e) =>
-                    setData({ ...data, [field.name]: e.target.value })
-                  }
-                  className="w-full mt-1 px-4 py-2 border rounded-xl"
-                />
-              </div>
-            ))}
-
-          <button
-            type="submit"
-            className="col-span-full mt-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-600 to-teal-500"
-          >
-            {loading ? "Predicting..." : "🔍 Predict"}
-          </button>
-        </form>
-
-        {/* Prediction Result */}
+        {/* ✅ RESULT SECTION */}
         {prediction !== null && (
           <div className="mt-6 text-center">
 
-            <p>Probability: {(probability * 100).toFixed(2)}%</p>
+            <p className="text-lg font-semibold">
+              Result: {prediction === 1 ? "Diabetic" : "Non-Diabetic"}
+            </p>
 
-            <h2 className={`text-xl font-bold ${prediction ? "text-red-600" : "text-green-600"}`}>
-              {prediction ? "⚠️ High Risk" : "✅ Low Risk"}
-            </h2>
+   <p>
+  Probability:{" "}
+  {!isNaN(probability)
+    ? (probability * 100).toFixed(2) + "%"
+    : "N/A"}
+</p>
+
+            {/* 🔥 SHAP */}
+            <div className="mt-4 text-left">
+              <h3 className="font-bold text-blue-700">Why this prediction?</h3>
+
+            {explanation
+  .sort((a, b) => Math.abs(b.impact) - Math.abs(a.impact))
+  .slice(0, 3)
+  .map((item, index) => (
+    <p key={index}>
+      {item.feature}: <b>{item.value}</b> →{" "}
+      {explainImpact(item.impact)}
+    </p>
+))}
+            </div>
 
             <button
               onClick={goToPreventive}
-              className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition"
+              className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-xl"
             >
               View Preventive Measures
             </button>
 
+
           </div>
         )}
-
-        <p className="text-xs text-center text-gray-500 mt-6">
-          ⚠️ This tool is for educational purposes only.
-        </p>
+        
       </div>
     </div>
   );
 }
+function explainImpact(val) {
+  if (val > 0.3) return "Strongly increases risk 🔴";
+  if (val > 0.1) return "Slightly increases risk 🟠";
+  if (val < -0.3) return "Strongly decreases risk 🟢";
+  if (val < -0.1) return "Slightly decreases risk 🟢";
+  return "No major impact ⚪";
+}
+/* ---------------- ROUTES ---------------- */
+function App() {
+  return (
+    <>
+    <Routes>
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/predict" element={<PredictionPage />} />
+      <Route path="/preventive" element={<PreventivePage />} />
+    </Routes>
+    <Chatbot/>
+    </>
+    
+  );
+}
 
 export default App;
+
