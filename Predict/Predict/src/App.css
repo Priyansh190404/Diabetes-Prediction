@@ -1,0 +1,4 @@
+/* App.css — global resets only; layout driven by Tailwind */
+#root {
+  min-height: 100vh;
+}

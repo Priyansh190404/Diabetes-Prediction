@@ -1,0 +1,74 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Source+Sans+3:wght@300;400;600&display=swap');
+@import "tailwindcss";
+
+/* ── Design tokens ── */
+@theme {
+  --color-brand:       var(--color-blue-600);
+  --color-brand-dark:  var(--color-blue-700);
+  --color-accent:      #14b8a6;
+  --color-surface:     #f5f9ff;
+
+  --font-display: 'Manrope', sans-serif;
+  --font-body:    'Source Sans 3', sans-serif;
+}
+
+/* ── Base resets ── */
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    font-family: var(--font-body);
+    background-color: var(--color-surface);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+  }
+}
+
+/* ── Animations ── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes floatY {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-8px); }
+}
+
+@keyframes spinSlow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@utility animate-fadeInUp {
+  animation: fadeInUp 0.7s ease-out both;
+}
+
+@utility animate-float {
+  animation: floatY 4s ease-in-out infinite;
+}
+
+@utility animate-spin-slow {
+  animation: spinSlow 30s linear infinite;
+}
+
+/* ── Dot-grid hero background ── */
+@utility dot-grid-bg {
+  background-color: #f5f9ff;
+  background-image: radial-gradient(circle, #bfdbfe 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* ── Glass card ── */
+@utility glass-card {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+}
