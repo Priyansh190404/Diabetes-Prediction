@@ -1,8 +1,4 @@
 {
-HEAD
-  "dependencies": {
-    "react-router-dom": "^7.13.1"
-=======
   "name": "abcd",
   "private": true,
   "version": "0.0.0",
@@ -35,6 +31,5 @@ HEAD
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
     "vite": "^7.2.4"
-
   }
-
+}

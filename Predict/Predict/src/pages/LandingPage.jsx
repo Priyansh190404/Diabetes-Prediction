@@ -165,7 +165,7 @@ function LandingPage() {
                 onClick={() => navigate("/predict")}
                 className="bg-gradient-to-r from-blue-600 to-teal-500 text-white px-7 py-3.5 rounded-xl font-semibold shadow-lg hover:opacity-90 transition-all flex items-center gap-2"
               >
-                Start Free Prediction <FiArrowRight size={16} />
+                Start Prediction <FiArrowRight size={16} />
               </button>
 
             </div>
@@ -327,7 +327,7 @@ function LandingPage() {
                 onClick={() => navigate("/predict")}
                 className="bg-white text-blue-600 px-10 py-4 rounded-xl font-bold text-base hover:bg-blue-50 transition-colors shadow-lg inline-flex items-center gap-2"
               >
-                Start Free Prediction <FiArrowRight size={16} />
+                Start Prediction <FiArrowRight size={16} />
               </button>
 
               <div className="mt-8 flex items-center justify-center gap-8 flex-wrap">

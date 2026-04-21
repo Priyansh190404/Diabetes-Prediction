@@ -135,29 +135,10 @@ function getLocalAnswer(message) {
   return null;
 }
 
-/* ── Try backend first, fall back to local FAQ ── */
-async function askQuestion(message) {
-  // 1. Try backend (server-side Gemini call — works reliably)
-  try {
-    const res = await fetch("http://127.0.0.1:8000/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message }),
-      signal: AbortSignal.timeout(8000),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.reply) return data.reply;
-    }
-  } catch {
-    // backend offline — fall through to local FAQ
-  }
-
-  // 2. Local FAQ fallback
+/* ── FAQ-only answer engine ── */
+function askQuestion(message) {
   const local = getLocalAnswer(message);
   if (local) return local;
-
-  // 3. Generic offline response
   return (
     "I can answer questions about diabetes topics such as symptoms, blood sugar levels, " +
     "diet, exercise, medications, BMI, HbA1c, risk factors, and complications. " +
@@ -172,57 +153,29 @@ const INITIAL_MESSAGE = {
   sender: "bot",
 };
 
-/* ── Typing dots indicator ── */
-function TypingDots() {
-  return (
-    <div className="flex justify-start">
-      <div className="bg-white border border-slate-100 shadow-sm rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-1.5">
-        {[0, 150, 300].map((delay) => (
-          <span
-            key={delay}
-            className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"
-            style={{ animationDelay: `${delay}ms` }}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
 
 export default function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([INITIAL_MESSAGE]);
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
   const bottomRef = useRef(null);
 
   /* Auto-scroll to latest message */
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
+  }, [messages]);
 
-  const handleSend = async (quickText) => {
+  const handleSend = (quickText) => {
     const message = quickText || input.trim();
-    if (!message || loading) return;
+    if (!message) return;
 
-    setMessages((prev) => [...prev, { text: message, sender: "user" }]);
+    const reply = askQuestion(message);
+    setMessages((prev) => [
+      ...prev,
+      { text: message, sender: "user" },
+      { text: reply, sender: "bot" },
+    ]);
     setInput("");
-    setLoading(true);
-
-    try {
-      const reply = await askQuestion(message);
-      setMessages((prev) => [...prev, { text: reply, sender: "bot" }]);
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          text: "Sorry, I couldn't connect right now. Please check your internet and try again.",
-          sender: "bot",
-        },
-      ]);
-    } finally {
-      setLoading(false);
-    }
   };
 
   return (
@@ -255,7 +208,7 @@ export default function Chatbot() {
                 >
                   Diabetes Assistant
                 </p>
-                <p className="text-blue-100 text-xs">Powered by Gemini AI</p>
+                <p className="text-blue-100 text-xs">Diabetes FAQ Assistant</p>
               </div>
             </div>
             <button
@@ -286,7 +239,6 @@ export default function Chatbot() {
               </div>
             ))}
 
-            {loading && <TypingDots />}
             <div ref={bottomRef} />
           </div>
 
@@ -297,12 +249,11 @@ export default function Chatbot() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
               placeholder="Ask about diabetes..."
-              disabled={loading}
-              className="flex-1 text-sm px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:border-blue-400 transition-colors disabled:opacity-50"
+              className="flex-1 text-sm px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:border-blue-400 transition-colors"
             />
             <button
               onClick={() => handleSend()}
-              disabled={loading || !input.trim()}
+              disabled={!input.trim()}
               aria-label="Send"
               className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-teal-500 flex items-center justify-center text-white hover:opacity-90 transition-opacity disabled:opacity-40 shrink-0"
             >
