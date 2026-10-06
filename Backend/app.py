@@ -6,6 +6,7 @@ import os
 import numpy as np
 import shap
 import requests
+import json
 
 # ---------- Paths ----------
 BASE_DIR = os.path.dirname(__file__)
@@ -29,8 +30,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-GEMINI_API_KEY = "AIzaSyArmbmZxNINa35lniVMxHbch2xOyOtXFF8"
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+GEMINI_URL = (
+    "https://generativelanguage.googleapis.com/"
+    "v1beta/models/gemini-2.0-flash:generateContent"
+)
 
 DIABETES_SYSTEM_PROMPT = (
     "You are a specialized Diabetes Health Assistant. "
@@ -51,7 +56,11 @@ def chat(q: ChatQuery):
     try:
         prompt = f"{DIABETES_SYSTEM_PROMPT}\n\nUser question: {q.message}"
         body = {"contents": [{"parts": [{"text": prompt}]}]}
-        response = requests.post(GEMINI_URL, json=body, timeout=15)
+        response = requests.post(
+    f"{GEMINI_URL}?key={GEMINI_API_KEY}",
+    json=body,
+    timeout=15
+)
         data = response.json()
         text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
         return {"reply": text or "I could not generate a response. Please try again."}
@@ -131,3 +140,21 @@ def predict(data: DiabetesInput):
         "probability": round(probability, 4),
         "explanation": explanation
     }
+
+
+@app.get("/comparison")
+def get_comparison():
+    comparison_path = os.path.join(BASE_DIR, "backend_model", "comparison.json")
+    fallback = {
+        "Logistic Regression": {"accuracy": 0.7725, "precision": 0.76,  "recall": 0.76, "f1_score": 0.75},
+        "XGBoost":             {"accuracy": 0.9043, "precision": 0.90,  "recall": 0.90, "f1_score": 0.90},
+        "Random Forest":       {"accuracy": 0.9819, "precision": 0.98,  "recall": 0.96, "f1_score": 0.97},
+        "SVM (Linear)":        {"accuracy": 0.7851, "precision": 0.74,  "recall": 0.58, "f1_score": 0.65},
+    }
+    try:
+        with open(comparison_path, "r") as f:
+            models = json.load(f)
+    except Exception:
+        models = fallback
+    best_model = max(models, key=lambda m: models[m]["accuracy"])
+    return {"models": models, "best_model": best_model}
