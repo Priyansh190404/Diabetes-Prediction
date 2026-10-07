@@ -68,7 +68,7 @@ export default function ModelComparisonChart() {
   const [loading, setLoading]     = useState(true);
 
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/comparison")
+    fetch("https://diabetes-prediction-api-t1qb.onrender.com/comparison")
       .then((r) => r.json())
       .then((res) => {
         setData(res.models);
