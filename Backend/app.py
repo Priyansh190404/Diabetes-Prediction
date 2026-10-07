@@ -17,7 +17,7 @@ SCALER_PATH = os.path.join(BASE_DIR, "backend_model", "scaler.pkl")
 model = joblib.load(MODEL_PATH)
 scaler = joblib.load(SCALER_PATH)
 
-# ✅ Correct explainer
+# Correct explainer
 explainer = shap.TreeExplainer(model)
 
 app = FastAPI()
@@ -48,24 +48,60 @@ DIABETES_SYSTEM_PROMPT = (
     "Do not use markdown formatting symbols."
 )
 
+
 class ChatQuery(BaseModel):
     message: str
+
 
 @app.post("/chat")
 def chat(q: ChatQuery):
     try:
         prompt = f"{DIABETES_SYSTEM_PROMPT}\n\nUser question: {q.message}"
-        body = {"contents": [{"parts": [{"text": prompt}]}]}
+
+        body = {
+            "contents": [
+                {
+                    "parts": [
+                        {
+                            "text": prompt
+                        }
+                    ]
+                }
+            ]
+        }
+
         response = requests.post(
-    f"{GEMINI_URL}?key={GEMINI_API_KEY}",
-    json=body,
-    timeout=15
-)
+            f"{GEMINI_URL}?key={GEMINI_API_KEY}",
+            json=body,
+            timeout=15
+        )
+
+        # Temporary debugging logs for Render
+        print("GEMINI STATUS:", response.status_code)
+        print("GEMINI RESPONSE:", response.text)
+
+        # Raise an exception for HTTP errors such as 400, 401, 403, 404, 429, 500
+        response.raise_for_status()
+
         data = response.json()
-        text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-        return {"reply": text or "I could not generate a response. Please try again."}
+
+        text = (
+            data.get("candidates", [{}])[0]
+            .get("content", {})
+            .get("parts", [{}])[0]
+            .get("text", "")
+        )
+
+        return {
+            "reply": text or "I could not generate a response. Please try again."
+        }
+
     except Exception as e:
-        return {"reply": f"Backend error: {str(e)}"}
+        print("GEMINI ERROR:", repr(e))
+        return {
+            "reply": f"Backend error: {str(e)}"
+        }
+
 
 class DiabetesInput(BaseModel):
     Pregnancies: float
@@ -77,13 +113,20 @@ class DiabetesInput(BaseModel):
     Dpf: float
     Age: float
 
+
 @app.post("/predict")
 def predict(data: DiabetesInput):
 
     # Original input
-    input_data = np.array([[ 
-        data.Pregnancies, data.Glucose, data.Bp, data.Skin,
-        data.Insulin, data.Bmi, data.Dpf, data.Age
+    input_data = np.array([[
+        data.Pregnancies,
+        data.Glucose,
+        data.Bp,
+        data.Skin,
+        data.Insulin,
+        data.Bmi,
+        data.Dpf,
+        data.Age
     ]], dtype=float)
 
     scaled_data = scaler.transform(input_data)
@@ -98,34 +141,40 @@ def predict(data: DiabetesInput):
 
     # Extract SHAP values for the positive class (diabetes = class 1)
     if isinstance(raw_shap, list) and len(raw_shap) > 1:
-        shap_array = raw_shap[1]          # positive class
+        shap_array = raw_shap[1]
     else:
         shap_array = raw_shap
 
     # Flatten to 1D array safely
-    if hasattr(shap_array, 'shape'):
-        if len(shap_array.shape) == 2:           # shape (1, 8)
+    if hasattr(shap_array, "shape"):
+        if len(shap_array.shape) == 2:
             shap_vals = shap_array[0]
-        elif len(shap_array.shape) == 1:         # already (8,)
+        elif len(shap_array.shape) == 1:
             shap_vals = shap_array
         else:
             shap_vals = np.array(shap_array).flatten()
     else:
         shap_vals = np.array(shap_array).flatten()
 
-    # Now safely convert every impact to pure Python float
+    # Convert every impact to a pure Python float
     feature_names = [
-        "Pregnancies", "Glucose", "BloodPressure",
-        "SkinThickness", "Insulin", "BMI", "DPF", "Age"
+        "Pregnancies",
+        "Glucose",
+        "BloodPressure",
+        "SkinThickness",
+        "Insulin",
+        "BMI",
+        "DPF",
+        "Age"
     ]
 
     explanation = []
+
     for i in range(len(feature_names)):
         impact = shap_vals[i]
 
-        # Ultra-safe conversion
         if isinstance(impact, (np.ndarray, np.generic)):
-            impact = np.asarray(impact).item()   # works for shape (1,) and 0-d
+            impact = np.asarray(impact).item()
         else:
             impact = float(impact)
 
@@ -144,17 +193,52 @@ def predict(data: DiabetesInput):
 
 @app.get("/comparison")
 def get_comparison():
-    comparison_path = os.path.join(BASE_DIR, "backend_model", "comparison.json")
+    comparison_path = os.path.join(
+        BASE_DIR,
+        "backend_model",
+        "comparison.json"
+    )
+
     fallback = {
-        "Logistic Regression": {"accuracy": 0.7725, "precision": 0.76,  "recall": 0.76, "f1_score": 0.75},
-        "XGBoost":             {"accuracy": 0.9043, "precision": 0.90,  "recall": 0.90, "f1_score": 0.90},
-        "Random Forest":       {"accuracy": 0.9819, "precision": 0.98,  "recall": 0.96, "f1_score": 0.97},
-        "SVM (Linear)":        {"accuracy": 0.7851, "precision": 0.74,  "recall": 0.58, "f1_score": 0.65},
+        "Logistic Regression": {
+            "accuracy": 0.7725,
+            "precision": 0.76,
+            "recall": 0.76,
+            "f1_score": 0.75
+        },
+        "XGBoost": {
+            "accuracy": 0.9043,
+            "precision": 0.90,
+            "recall": 0.90,
+            "f1_score": 0.90
+        },
+        "Random Forest": {
+            "accuracy": 0.9819,
+            "precision": 0.98,
+            "recall": 0.96,
+            "f1_score": 0.97
+        },
+        "SVM (Linear)": {
+            "accuracy": 0.7851,
+            "precision": 0.74,
+            "recall": 0.58,
+            "f1_score": 0.65
+        }
     }
+
     try:
         with open(comparison_path, "r") as f:
             models = json.load(f)
     except Exception:
         models = fallback
-    best_model = max(models, key=lambda m: models[m]["accuracy"])
-    return {"models": models, "best_model": best_model}
+
+    best_model = max(
+        models,
+        key=lambda m: models[m]["accuracy"]
+    )
+
+    return {
+        "models": models,
+        "best_model": best_model
+    }
+
