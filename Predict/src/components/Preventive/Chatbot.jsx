@@ -139,7 +139,7 @@ function getLocalAnswer(message) {
 async function askQuestion(message) {
   // 1. Try backend (server-side Gemini call — works reliably)
   try {
-    const res = await fetch("http://127.0.0.1:8000/chat", {
+    const res = await fetch("https://diabetes-prediction-api-t1qb.onrender.com/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message }),
@@ -314,3 +314,4 @@ export default function Chatbot() {
     </>
   );
 }
+
