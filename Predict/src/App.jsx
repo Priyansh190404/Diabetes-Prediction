@@ -69,14 +69,13 @@ function PredictionPage() {
       };
 
       const res = await fetch(
-  `${process.env.NEXT_PUBLIC_API_URL}/predict`,
+  `${import.meta.env.VITE_API_URL}/predict`,
   {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   }
 );
-
       const result = await res.json();
 
       setPrediction(result.prediction);
