@@ -24,16 +24,10 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    app.add_middleware(
-    CORSMiddleware,
     allow_origins=[
         "https://diabetes-prediction-ps-32fc.vercel.app",
         "https://diabetes-prediction-ksprgz79e-ps-32fc.vercel.app",
     ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
