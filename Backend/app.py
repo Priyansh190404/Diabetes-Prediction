@@ -78,6 +78,11 @@ def chat(q: ChatQuery):
             ]
         }
 
+        if not GEMINI_API_KEY:
+            return {
+                "reply": "The assistant is unavailable right now (code: GEMINI_API_KEY is not set on the server)."
+            }
+
         # The key goes in a header, not the URL, so it can never show up in an error message
         response = requests.post(
             GEMINI_URL,
@@ -88,7 +93,20 @@ def chat(q: ChatQuery):
 
         print("GEMINI STATUS:", response.status_code)
 
-        # Raise an exception for HTTP errors such as 400, 401, 403, 404, 429, 500
+        # TEMPORARY DIAGNOSTIC: show Google's reason in the chat so setup problems are easy to see.
+        # Once the chatbot works, delete this block and the code shown after "unavailable" below.
+        if response.status_code != 200:
+            try:
+                err = response.json().get("error", {})
+                reason = f'{err.get("status", "")} - {err.get("message", "")}'
+            except Exception:
+                reason = response.text
+            reason = reason[:200]
+            print("GEMINI ERROR BODY:", reason)
+            return {
+                "reply": f"The assistant is unavailable right now (code {response.status_code}). {reason}"
+            }
+
         response.raise_for_status()
 
         data = response.json()
@@ -108,7 +126,7 @@ def chat(q: ChatQuery):
         # Details stay in the server log; visitors only see a generic message
         print("GEMINI ERROR:", type(e).__name__)
         return {
-            "reply": "The assistant is unavailable right now. Please try again in a moment."
+            "reply": f"The assistant is unavailable right now (code: {type(e).__name__}). Please try again in a moment."
         }
 
 
