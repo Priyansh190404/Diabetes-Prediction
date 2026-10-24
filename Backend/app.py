@@ -25,9 +25,14 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "https://diabetes-prediction-beta-one.vercel.app",
         "https://diabetes-prediction-ps-32fc.vercel.app",
         "https://diabetes-prediction-ksprgz79e-ps-32fc.vercel.app",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
     ],
+    # Any other Vercel address of this project (previews, new aliases)
+    allow_origin_regex=r"https://diabetes-prediction-.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -73,15 +78,15 @@ def chat(q: ChatQuery):
             ]
         }
 
+        # The key goes in a header, not the URL, so it can never show up in an error message
         response = requests.post(
-            f"{GEMINI_URL}?key={GEMINI_API_KEY}",
+            GEMINI_URL,
+            headers={"x-goog-api-key": GEMINI_API_KEY or ""},
             json=body,
             timeout=15
         )
 
-        # Temporary debugging logs for Render
         print("GEMINI STATUS:", response.status_code)
-        print("GEMINI RESPONSE:", response.text)
 
         # Raise an exception for HTTP errors such as 400, 401, 403, 404, 429, 500
         response.raise_for_status()
@@ -100,9 +105,10 @@ def chat(q: ChatQuery):
         }
 
     except Exception as e:
-        print("GEMINI ERROR:", repr(e))
+        # Details stay in the server log; visitors only see a generic message
+        print("GEMINI ERROR:", type(e).__name__)
         return {
-            "reply": f"Backend error: {str(e)}"
+            "reply": "The assistant is unavailable right now. Please try again in a moment."
         }
 
 
